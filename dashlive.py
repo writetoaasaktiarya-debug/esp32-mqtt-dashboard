@@ -35,7 +35,7 @@ def start_mqtt():
         print("Reason:", reason_code)
         print("=================================")
 
-        client.subscribe("haes/esp32/telemetry")
+       client.subscribe("haes/esp32/telemetry/aasakti2026")
 
         print("SUBSCRIBED TO: haes/esp32/telemetry")
 
