@@ -11,6 +11,7 @@ import paho.mqtt.client as mqtt
 
 st.set_page_config(
     page_title="ESP32 MQTT Dashboard",
+    page_icon="🔋",
     layout="centered"
 )
 
@@ -18,72 +19,76 @@ st.title("🔋 ESP32 Live MQTT Telemetry Dashboard")
 
 
 # --------------------------------------------------
-# GLOBAL MQTT QUEUE
-# DO NOT PUT THIS IN st.session_state
-# --------------------------------------------------
-
-mqtt_queue = queue.Queue()
-
-
-# --------------------------------------------------
-# MQTT CALLBACKS
-# --------------------------------------------------
-
-def on_connect(client, userdata, flags, reason_code, properties=None):
-
-    print("Connected to MQTT broker")
-
-    client.subscribe("haes/esp32/telemetry")
-
-    print("Subscribed to: haes/esp32/telemetry")
-
-
-def on_message(client, userdata, msg):
-
-    try:
-
-        payload = msg.payload.decode()
-
-        print("MQTT RECEIVED:", payload)
-
-        data = json.loads(payload)
-
-        mqtt_queue.put(data)
-
-    except Exception as e:
-
-        print("MQTT ERROR:", e)
-
-
-# --------------------------------------------------
-# START MQTT
+# MQTT CLIENT + QUEUE
+# BOTH ARE CREATED ONCE
 # --------------------------------------------------
 
 @st.cache_resource
 def start_mqtt():
 
+    mqtt_queue = queue.Queue()
+
+    def on_connect(client, userdata, flags, reason_code, properties=None):
+
+        print("=================================")
+        print("CONNECTED TO MQTT BROKER")
+        print("Reason:", reason_code)
+        print("=================================")
+
+        client.subscribe("haes/esp32/telemetry")
+
+        print("SUBSCRIBED TO: haes/esp32/telemetry")
+
+    def on_message(client, userdata, msg):
+
+        try:
+
+            payload = msg.payload.decode()
+
+            print("MQTT RECEIVED:")
+            print(payload)
+
+            data = json.loads(payload)
+
+            mqtt_queue.put(data)
+
+        except Exception as e:
+
+            print("MQTT MESSAGE ERROR:", e)
+
     try:
+
         client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2
         )
+
     except AttributeError:
+
         client = mqtt.Client()
 
     client.on_connect = on_connect
     client.on_message = on_message
 
-    client.connect(
-        "broker.hivemq.com",
-        1883,
-        60
-    )
+    try:
 
-    client.loop_start()
+        client.connect(
+            "broker.hivemq.com",
+            1883,
+            60
+        )
 
-    return client
+        print("MQTT CONNECTION STARTED")
+
+        client.loop_start()
+
+    except Exception as e:
+
+        print("MQTT CONNECTION ERROR:", e)
+
+    return client, mqtt_queue
 
 
-client = start_mqtt()
+client, mqtt_queue = start_mqtt()
 
 
 # --------------------------------------------------
@@ -114,18 +119,26 @@ if "history" not in st.session_state:
 @st.fragment(run_every=1)
 def live_dashboard():
 
-    # Process all received MQTT messages
+    # ----------------------------------------------
+    # READ MQTT QUEUE
+    # ----------------------------------------------
+
+    received = False
+
     while not mqtt_queue.empty():
 
         data = mqtt_queue.get()
 
-        print("PROCESSING:", data)
+        print("PROCESSING DATA:", data)
 
-        # Make sure all required fields exist
-        if all(
-            key in data
-            for key in ["temp", "press", "heat", "motor"]
-        ):
+        required = [
+            "temp",
+            "press",
+            "heat",
+            "motor"
+        ]
+
+        if all(key in data for key in required):
 
             st.session_state.latest_data = data
 
@@ -143,20 +156,27 @@ def live_dashboard():
                 ignore_index=True
             )
 
-            # Keep only latest 40 readings
-            if len(st.session_state.history) > 40:
+            received = True
 
-                st.session_state.history = (
-                    st.session_state.history.iloc[-40:]
-                )
+    # ----------------------------------------------
+    # KEEP LAST 40 VALUES
+    # ----------------------------------------------
 
-    # Current values
+    if len(st.session_state.history) > 40:
+
+        st.session_state.history = (
+            st.session_state.history.iloc[-40:]
+        )
+
+    # ----------------------------------------------
+    # CURRENT DATA
+    # ----------------------------------------------
+
     data = st.session_state.latest_data
 
-
-    # --------------------------------------------------
+    # ----------------------------------------------
     # METRICS
-    # --------------------------------------------------
+    # ----------------------------------------------
 
     col1, col2 = st.columns(2)
 
@@ -169,9 +189,8 @@ def live_dashboard():
 
         st.metric(
             "Heater PWM Output",
-            data["heat"]
+            int(data["heat"])
         )
-
 
     with col2:
 
@@ -182,13 +201,12 @@ def live_dashboard():
 
         st.metric(
             "Max Motor Limit",
-            data["motor"]
+            int(data["motor"])
         )
 
-
-    # --------------------------------------------------
+    # ----------------------------------------------
     # GRAPH
-    # --------------------------------------------------
+    # ----------------------------------------------
 
     st.subheader("Live Temperature Trend")
 
@@ -202,9 +220,12 @@ def live_dashboard():
     else:
 
         st.info(
-            "Waiting for data stream from ESP32 simulation..."
+            "Waiting for data stream from ESP32..."
         )
 
 
-# Run dashboard
+# --------------------------------------------------
+# RUN
+# --------------------------------------------------
+
 live_dashboard()
