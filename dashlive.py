@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🛰️ HAES — High-Altitude Environmental Shield")
-st.caption("LAC Forward Deployment Simulation · Battery Microclimate Control · Unit: aasakti2026")
+st.caption("LAC Forward Deployment Simulation · Battery Microclimate Control · Unit: ZeroK2026")
 
 TARGET_TEMP = 15.0
 BAND = 2.0  # acceptable ± band around target
