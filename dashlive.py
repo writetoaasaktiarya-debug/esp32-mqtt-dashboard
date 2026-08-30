@@ -20,7 +20,6 @@ st.title("🔋 ESP32 Live MQTT Telemetry Dashboard")
 
 # --------------------------------------------------
 # MQTT CLIENT + QUEUE
-# BOTH ARE CREATED ONCE
 # --------------------------------------------------
 
 @st.cache_resource
@@ -35,9 +34,13 @@ def start_mqtt():
         print("Reason:", reason_code)
         print("=================================")
 
-       client.subscribe("haes/esp32/telemetry/aasakti2026")
+        client.subscribe(
+            "haes/esp32/telemetry/aasakti2026"
+        )
 
-        print("SUBSCRIBED TO: haes/esp32/telemetry")
+        print(
+            "Subscribed to: haes/esp32/telemetry/aasakti2026"
+        )
 
     def on_message(client, userdata, msg):
 
@@ -119,12 +122,6 @@ if "history" not in st.session_state:
 @st.fragment(run_every=1)
 def live_dashboard():
 
-    # ----------------------------------------------
-    # READ MQTT QUEUE
-    # ----------------------------------------------
-
-    received = False
-
     while not mqtt_queue.empty():
 
         data = mqtt_queue.get()
@@ -156,11 +153,7 @@ def live_dashboard():
                 ignore_index=True
             )
 
-            received = True
-
-    # ----------------------------------------------
-    # KEEP LAST 40 VALUES
-    # ----------------------------------------------
+    # Keep only last 40 readings
 
     if len(st.session_state.history) > 40:
 
@@ -168,15 +161,14 @@ def live_dashboard():
             st.session_state.history.iloc[-40:]
         )
 
-    # ----------------------------------------------
-    # CURRENT DATA
-    # ----------------------------------------------
+    # Current data
 
     data = st.session_state.latest_data
 
-    # ----------------------------------------------
+
+    # --------------------------------------------------
     # METRICS
-    # ----------------------------------------------
+    # --------------------------------------------------
 
     col1, col2 = st.columns(2)
 
@@ -204,9 +196,10 @@ def live_dashboard():
             int(data["motor"])
         )
 
-    # ----------------------------------------------
+
+    # --------------------------------------------------
     # GRAPH
-    # ----------------------------------------------
+    # --------------------------------------------------
 
     st.subheader("Live Temperature Trend")
 
@@ -225,7 +218,7 @@ def live_dashboard():
 
 
 # --------------------------------------------------
-# RUN
+# RUN DASHBOARD
 # --------------------------------------------------
 
 live_dashboard()
